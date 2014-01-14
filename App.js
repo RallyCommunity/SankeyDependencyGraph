@@ -1,3 +1,6 @@
+var Ext = window.Ext4 || window.Ext;
+var _ = window._;
+
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
@@ -18,7 +21,7 @@ Ext.define('CustomApp', {
         context: {
           workspace: this.getContext().getWorkspaceRef()
         },
-        fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState'],
+        fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
         hydrate: ['ScheduleState'],
         find: {
           _TypeHierarchy: 'HierarchicalRequirement',
@@ -37,7 +40,11 @@ Ext.define('CustomApp', {
           var source, target;
 
           _.each(records, function (rec) {
-            this.nodes.push({name: rec.get('Name'), size: rec.get('PlanEstimate')});
+            this.nodes.push({
+                name: rec.get('Name'),
+                size: rec.get('PlanEstimate'),
+                displayColor: rec.get('DisplayColor')
+            });
             this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
             if (rec.get('Predecessors').length === 0) { this.noPred++; }
             if (rec.get('Successors').length === 0) { this.noSuc++; }
@@ -51,7 +58,7 @@ Ext.define('CustomApp', {
               target = this.oidMap[suc];
               console.log('From', source, 'To', target);
 
-              if (source && target) {
+            if (_.isNumber(source) && _.isNumber(target)) {
                 this.links.push({source: source, target: target, value: 1});
               }
             }, this);
@@ -78,7 +85,7 @@ Ext.define('CustomApp', {
 
       var formatNumber = d3.format(",.0f"),
           format = function(d) { return formatNumber(d) + " SP"; },
-          color = d3.scale.category20();
+          color = function (c) { return c || '#2ecc71'; };
 
       var svg = d3.select(this.getEl().dom).append('svg')
         .attr("width", width + margin.left + margin.right)
@@ -120,7 +127,7 @@ Ext.define('CustomApp', {
       node.append("rect")
         .attr("height", function(d) { return d.dy; })
         .attr("width", sankey.nodeWidth())
-        .style("fill", function(d) { return d.color = color(d.name.replace(/ .*/, "")); })
+        .style("fill", function(d) { return d.color = color(d.displayColor); })
         .style("stroke", function(d) { return d3.rgb(d.color).darker(2); })
         .append("title")
         .text(function(d) { return d.name + "\n" + format(d.size); });
@@ -131,7 +138,7 @@ Ext.define('CustomApp', {
         .attr("dy", ".35em")
         .attr("text-anchor", "end")
         .attr("transform", null)
-        .text(function(d) { return d.name; })
+        .text(function(d) { return Ext.util.Format.ellipsis(d.name, 60, true); })
         .filter(function(d) { return d.x < width / 2; })
         .attr("x", 6 + sankey.nodeWidth())
         .attr("text-anchor", "start");
