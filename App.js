@@ -28,7 +28,7 @@ Ext.define('CustomApp', {
           _ProjectHierarchy: { $in: this.getContext().getProject().ObjectID },
           __At: 'current',
           $or: [
-            { Sucessors: { $ne: null } },
+            { Successors: { $ne: null } },
             { Predecessors: { $ne: null } }
           ]
         }
