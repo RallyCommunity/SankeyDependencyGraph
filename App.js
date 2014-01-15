@@ -85,7 +85,7 @@ Ext.define('CustomApp', {
 
       var formatNumber = d3.format(",.0f"),
           format = function(d) { return formatNumber(d) + " SP"; },
-          color = function (c) { return c || '#2ecc71'; };
+          color = function (c) { return c || '#21a2e0'; };
 
       var svg = d3.select(this.getEl().dom).append('svg')
         .attr("width", width + margin.left + margin.right)
