@@ -9638,12 +9638,12 @@ Ext.define('CustomApp', {
             this.nodes.push({
                 name: rec.get('Name'),
                 size: rec.get('PlanEstimate'),
-                displayColor: rec.get('DisplayColor')
+                displayColor: rec.get('DisplayColor') || '#00A9E0',
+                ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
             });
             this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
             if (rec.get('Predecessors').length === 0) { this.noPred++; }
             if (rec.get('Successors').length === 0) { this.noSuc++; }
-            console.log('Found Record', rec.get('Name'), (rec.get('Predecessors') || []).length, (rec.get('Successors') || []).length);
           }, this);
 
           _.each(records, function (rec) {
@@ -9651,7 +9651,6 @@ Ext.define('CustomApp', {
 
             _.each(rec.get('Successors'), function (suc) {
               target = this.oidMap[suc];
-              console.log('From', source, 'To', target);
 
             if (_.isNumber(source) && _.isNumber(target)) {
                 this.links.push({source: source, target: target, value: 1});
@@ -9659,9 +9658,6 @@ Ext.define('CustomApp', {
             }, this);
           }, this);
 
-          console.log('Data Loaded');
-          console.log(this.nodes);
-          console.log(this.links);
           this.render();
         }
       });
@@ -9680,7 +9676,7 @@ Ext.define('CustomApp', {
 
       var formatNumber = d3.format(",.0f"),
           format = function(d) { return formatNumber(d) + " SP"; },
-          color = function (c) { return c || '#21a2e0'; };
+          color = function (c) { return c; };
 
       var svg = d3.select(this.getEl().dom).append('svg')
         .attr("width", width + margin.left + margin.right)
@@ -9726,6 +9722,9 @@ Ext.define('CustomApp', {
         .style("stroke", function(d) { return d3.rgb(d.color).darker(2); })
         .append("title")
         .text(function(d) { return d.name + "\n" + format(d.size); });
+
+      node
+        .on('dblclick', function (d) { Rally.nav.Manager.showDetail(d.ref); });
 
       node.append("text")
         .attr("x", -6)
