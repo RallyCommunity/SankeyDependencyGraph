@@ -14,7 +14,7 @@ Ext.define('CustomApp', {
       this.noPred = 0;
       this.noSuc = 0;
 
-      if ( this.getContext().isFeatureEnabled('A2_ENABLE_CHARTING_APPLICATIONS') ) {
+      if ( window && window.parent && window.parent.FEATURE_TOGGLES.A2_ENABLE_CHARTING_APPLICATIONS ) {
         this.loadDataLB();
       } else {
         this.loadDataWS();
