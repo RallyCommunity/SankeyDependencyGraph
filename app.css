@@ -18,3 +18,13 @@
 .link:hover {
   stroke-opacity: .5;
 }
+
+.blocked {
+  fill: none;
+  stroke: #F00;
+  stroke-opacity: .2;
+}
+
+.blocked:hover {
+  stroke-opacity: .5;
+}

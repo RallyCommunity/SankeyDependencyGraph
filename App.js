@@ -21,6 +21,17 @@ Ext.define('CustomApp', {
       }
     },
 
+    _makeDataObj: function (rec) {
+      return {
+        oid: rec.get('ObjectID'),
+        name: rec.get('Name'),
+        size: rec.get('PlanEstimate'),
+        blocked: rec.get('Blocked'),
+        displayColor: rec.get('DisplayColor') || '#00A9E0',
+        ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
+      };
+    },
+
     loadDataWS: function () {
       var me = this;
       var wss = Ext.create('Rally.data.wsapi.Store', {
@@ -57,13 +68,7 @@ Ext.define('CustomApp', {
             _(records)
               .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; })
               .each(function (rec) {
-                this.nodes.push({
-                  oid: rec.get('ObjectID'),
-                  name: rec.get('Name'),
-                  size: rec.get('PlanEstimate'),
-                  displayColor: rec.get('DisplayColor') || '#00A9E0',
-                  ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
-                });
+                this.nodes.push(this._makeDataObj(rec));
 
                 this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
 
@@ -116,13 +121,8 @@ Ext.define('CustomApp', {
           var source, target;
 
           _.each(records, function (rec) {
-            this.nodes.push({
-              oid: rec.get('ObjectID'),
-              name: rec.get('Name'),
-              size: rec.get('PlanEstimate'),
-              displayColor: rec.get('DisplayColor') || '#00A9E0',
-              ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
-            });
+            this.nodes.push(this._makeDataObj(rec));
+
             this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
             if (rec.get('Predecessors').length === 0) { this.noPred++; }
             if (rec.get('Successors').length === 0) { this.noSuc++; }
@@ -179,7 +179,7 @@ Ext.define('CustomApp', {
       var link = svg.append("g").selectAll(".link")
         .data(this.links)
       .enter().append("path")
-        .attr("class", "link")
+        .attr("class", function (d) { return d.source.blocked ? "blocked" : "link"; })
         .attr("d", path)
         .style("stroke-width", function(d) { return Math.max(1, d.dy); })
         .sort(function(a, b) { return b.dy - a.dy; });
