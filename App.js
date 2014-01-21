@@ -5,6 +5,8 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
 
+    fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
+
     launch: function() {
       this.nodes = [];
       this.links = [];
@@ -12,16 +14,90 @@ Ext.define('CustomApp', {
       this.noPred = 0;
       this.noSuc = 0;
 
-      this.loadData();
+      if ( this.getContext().isFeatureEnabled('A2_ENABLE_CHARTING_APPLICATIONS') ) {
+        this.loadDataLB();
+      } else {
+        this.loadDataWS();
+      }
     },
 
-    loadData: function () {
+    loadDataWS: function () {
+      var me = this;
+      var wss = Ext.create('Rally.data.wsapi.Store', {
+        model: 'UserStory',
+        autoLoad: false,
+        fetch: this.fetch,
+        limit: Infinity
+      });
+
+      wss.load({
+        scope: this,
+        callback: function (records, options, success) {
+          var recs = _(records)
+            .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; }, this)
+            .map(function (rec) {
+              var ret = [];
+              var s = rec.get('ObjectID');
+
+              if (rec.data.Successors.Count) {
+                ret.push(rec.getCollection('Successors').load({fetch: me.fetch}).then(function (succs) {
+                  _.each(succs, function (t) { me.links.push({source: s, target: t.get('ObjectID'), link: 1}); });
+                  return true;
+                }));
+              }
+
+              return ret;
+            }, this)
+            .flatten()
+            .value();
+
+          Deft.Promise.all(recs).then(function () {
+            console.log('Loaded all succs/preds');
+            console.log(arguments[0]);
+            _(records)
+              .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; })
+              .each(function (rec) {
+                this.nodes.push({
+                  oid: rec.get('ObjectID'),
+                  name: rec.get('Name'),
+                  size: rec.get('PlanEstimate'),
+                  displayColor: rec.get('DisplayColor') || '#00A9E0',
+                  ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
+                });
+
+                this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
+
+                //console.log(rec.get('Name'), rec.getCollection('Successors').getCount());
+                //console.dir(rec.getCollection('Successors'));
+                //_.each(rec.getCollection('Successors').getRange(), function (succ) {
+                  //console.log('Found Successor', succ.data);
+                  //this.links.push({source: rec.get('ObjectID'), target: succ.get('ObjectID'), value: 1});
+                //}, this);
+
+              }, me);
+
+            me.links = _(me.links)
+              .map(function (l) { return { source: me.oidMap[l.source], target: me.oidMap[l.target], value: 1 }; })
+              .filter(function (l) { return _.isNumber(l.source) && _.isNumber(l.target); })
+              .value();
+
+            console.log('Data', me.nodes);
+            console.log('Links', me.links);
+            me.render();
+          });
+
+          console.log(recs);
+        }
+      });
+    },
+
+    loadDataLB: function () {
       var sss = Ext.create('Rally.data.lookback.SnapshotStore', {
         autoLoad: false,
         context: {
           workspace: this.getContext().getWorkspaceRef()
         },
-        fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
+        fetch: this.fetch,
         hydrate: ['ScheduleState'],
         find: {
           _TypeHierarchy: 'HierarchicalRequirement',
@@ -41,10 +117,11 @@ Ext.define('CustomApp', {
 
           _.each(records, function (rec) {
             this.nodes.push({
-                name: rec.get('Name'),
-                size: rec.get('PlanEstimate'),
-                displayColor: rec.get('DisplayColor') || '#00A9E0',
-                ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
+              oid: rec.get('ObjectID'),
+              name: rec.get('Name'),
+              size: rec.get('PlanEstimate'),
+              displayColor: rec.get('DisplayColor') || '#00A9E0',
+              ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
             });
             this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
             if (rec.get('Predecessors').length === 0) { this.noPred++; }
@@ -73,7 +150,7 @@ Ext.define('CustomApp', {
           h = this.getHeight(),
           t = (this.noPred > this.noSuc) ? this.noPred : this.noSuc;
 
-     if (t * 32 > h) { h = (t + 2) * 32; };
+     if (t * 32 > h) { h = (t + 2) * 32; }
 
       var margin = {top: 1, right: 1, bottom: 6, left: 1},
           width = w - margin.left - margin.right,
@@ -108,7 +185,7 @@ Ext.define('CustomApp', {
         .sort(function(a, b) { return b.dy - a.dy; });
 
       link.append("title")
-        .text(function(d) { return d.source.name + " →  " + d.target.name });
+        .text(function(d) { return d.source.name + " →  " + d.target.name; });
 
       var node = svg.append("g").selectAll(".node")
         .data(this.nodes)
