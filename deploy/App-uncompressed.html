@@ -9647,8 +9647,8 @@ Ext.define('CustomApp', {
             .value();
 
           Deft.Promise.all(recs).then(function () {
-            console.log('Loaded all succs/preds');
-            console.log(arguments[0]);
+            //console.log('Loaded all succs/preds');
+            //console.log(arguments[0]);
             _(records)
               .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; })
               .each(function (rec) {
@@ -9676,12 +9676,12 @@ Ext.define('CustomApp', {
               .filter(function (l) { return _.isNumber(l.source) && _.isNumber(l.target); })
               .value();
 
-            console.log('Data', me.nodes);
-            console.log('Links', me.links);
+            //console.log('Data', me.nodes);
+            //console.log('Links', me.links);
             me.render();
           });
 
-          console.log(recs);
+          //console.log(recs);
         }
       });
     },
