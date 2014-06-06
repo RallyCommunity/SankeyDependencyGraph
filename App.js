@@ -106,7 +106,7 @@ Ext.define('CustomApp', {
         hydrate: ['ScheduleState'],
         find: {
           _TypeHierarchy: 'HierarchicalRequirement',
-          _ProjectHierarchy: { $in: this.getContext().getProject().ObjectID },
+          _ProjectHierarchy: { $in: [this.getContext().getProject().ObjectID] },
           __At: 'current',
           $or: [
             { Successors: { $ne: null } },
