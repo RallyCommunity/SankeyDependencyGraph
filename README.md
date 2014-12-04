@@ -17,7 +17,7 @@ To visualize portfolio item dependencies
 * Check 'Show Portfolio Items'
 * Choose the Portfolio Item Type (portfolio item dependencies are always between the same type)
 
-![settings-dialog](https://raw.githubusercontent.com/RallyCommunity/SankeyDependencyGraph/portfolio-items/docs/portfolio-settings.png)
+![settings-dialog](https://raw.githubusercontent.com/RallyCommunity/SankeyDependencyGraph/portfolio-items/docs/portfolio-settings.png | height = 100px)
 
 
 ![portfolio-chart](https://raw.githubusercontent.com/RallyCommunity/SankeyDependencyGraph/portfolio-items/docs/portfolio-dependencies.png)
