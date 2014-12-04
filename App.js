@@ -1,5 +1,6 @@
 var Ext = window.Ext4 || window.Ext;
 var _ = window._;
+var app = null;
 
 Ext.define('CustomApp', {
     extend: 'Rally.app.App',
@@ -7,18 +8,78 @@ Ext.define('CustomApp', {
 
     fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
 
+    config: {
+
+      defaultSettings : {
+        showPortfolioItems : true,
+        portfolioItemsType : "PortfolioItem/Feature"
+      }
+    },
+
+    getSettingsFields: function() {
+
+    return [
+      {
+        name: 'showPortfolioItems',
+        xtype: 'rallycheckboxfield',
+        label: 'Check to chart Portfolio Items',
+        width : 300
+      },
+      {
+        xtype: 'rallyportfolioitemtypecombobox',
+        name : 'portfolioItemsType',
+        label : 'Select the portfolio item type',
+        width : 300
+      }
+    ];
+    },
+
+
     launch: function() {
+      app = this;
       this.nodes = [];
       this.links = [];
       this.oidMap = {};
       this.noPred = 0;
       this.noSuc = 0;
 
-      if ( window && window.parent && window.parent.FEATURE_TOGGLES.A2_ENABLE_CHARTING_APPLICATIONS ) {
-        this.loadDataLB();
+      app.showPortfolioItems = app.getSetting('showPortfolioItems');
+      app.portfolioItemsType = app.getSetting('portfolioItemsType');
+
+      console.log("Type:",app.portfolioItemsType);
+
+      if (app.showPortfolioItems) {
+
+        var piStore = Ext.create('Rally.data.wsapi.Store', {
+          // model: 'UserStory',
+          model : 'TypeDefinition',
+          autoLoad: false,
+          fetch: ['Name','TypePath'],
+          filters : [{property:"ObjectID",operator:"=",value:_.last( app.portfolioItemsType.split("/"))}],
+          limit: Infinity
+        });
+
+        piStore.load({
+          scope: this,
+          callback: function (records, options, success) {
+            console.log("read:",records.length,records);
+            app.piTypePath = _.first(records).get("TypePath");
+            app.loadDataWS();
+          }
+        });
+
       } else {
-        this.loadDataWS();
+        if ( !_.isUndefined(window) && 
+              !_.isUndefined(window.parent) &&
+                !_.isUndefined(window.parent.FEATURE_TOGGLES) &&
+                  (window.parent.FEATURE_TOGGLES.A2_ENABLE_CHARTING_APPLICATIONS === true) &&
+                  (app.showPortfolioItems===false)) {
+                    this.loadDataLB();
+                  } else {
+                    this.loadDataWS();        
+                }
       }
+
     },
 
     _makeDataObj: function (rec) {
@@ -35,7 +96,8 @@ Ext.define('CustomApp', {
     loadDataWS: function () {
       var me = this;
       var wss = Ext.create('Rally.data.wsapi.Store', {
-        model: 'UserStory',
+        // model: 'UserStory',
+        model : app.showPortfolioItems ? /*'PortfolioItem/Feature'*/ app.piTypePath : 'UserStory',
         autoLoad: false,
         fetch: this.fetch,
         limit: Infinity
@@ -44,6 +106,7 @@ Ext.define('CustomApp', {
       wss.load({
         scope: this,
         callback: function (records, options, success) {
+          console.log("read:",records.length);
           var recs = _(records)
             .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; }, this)
             .map(function (rec) {
