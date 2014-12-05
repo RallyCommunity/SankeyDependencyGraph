@@ -11,7 +11,7 @@ Ext.define('CustomApp', {
     config: {
 
       defaultSettings : {
-        showPortfolioItems : true,
+        showPortfolioItems : false,
         portfolioItemsType : "PortfolioItem/Feature"
       }
     },
