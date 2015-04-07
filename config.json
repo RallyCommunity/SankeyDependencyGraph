@@ -4,7 +4,7 @@
    "server": "https://rally1.rallydev.com",
    "sdk": "2.0rc2",
    "javascript": [
-      "vendor/d3.js",
+      "vendor/d3.min.js",
       "vendor/sankey.js",
       "App.js"
    ],

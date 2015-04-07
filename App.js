@@ -11,8 +11,9 @@ Ext.define('CustomApp', {
     config: {
 
       defaultSettings : {
-        showPortfolioItems : false,
-        portfolioItemsType : "PortfolioItem/Feature"
+        showPortfolioItems : true,
+        portfolioItemsType : "PortfolioItem/Feature",
+        releaseName : ""
       }
     },
 
@@ -55,7 +56,8 @@ Ext.define('CustomApp', {
           model : 'TypeDefinition',
           autoLoad: false,
           fetch: ['Name','TypePath'],
-          filters : [{property:"ObjectID",operator:"=",value:_.last( app.portfolioItemsType.split("/"))}],
+          filters : [{property:"Creatable",operator:"=",value:true},
+                      {property:"Ordinal",operator:"=",value:0}],
           limit: Infinity
         });
 
