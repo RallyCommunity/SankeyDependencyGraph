@@ -6,7 +6,7 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
 
-    fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
+    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
 
     config: {
 
@@ -54,9 +54,9 @@ Ext.define('CustomApp', {
         piStore.load({
           scope: this,
           callback: function (records, options, success) {
-            console.log("read:",records.length,records);
+            // console.log("read:",records.length,records);
             app.piTypePath = _.first(records).get("TypePath");
-            console.log("type:",app.piTypePath);
+            // console.log("type:",app.piTypePath);
             app.loadDataWS();
           }
         });
@@ -77,6 +77,7 @@ Ext.define('CustomApp', {
 
     _makeDataObj: function (rec) {
       return {
+        formattedid : rec.get('FormattedID'),
         oid: rec.get('ObjectID'),
         name: rec.get('Name'),
         size: rec.get('PlanEstimate'),
@@ -99,7 +100,7 @@ Ext.define('CustomApp', {
       wss.load({
         scope: this,
         callback: function (records, options, success) {
-          console.log("read:",records.length);
+          // console.log("read:",records.length);
           var recs = _(records)
             .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; }, this)
             .map(function (rec) {
@@ -119,8 +120,8 @@ Ext.define('CustomApp', {
             .value();
 
           Deft.Promise.all(recs).then(function () {
-            //console.log('Loaded all succs/preds');
-            //console.log(arguments[0]);
+            console.log('Loaded all succs/preds');
+            console.log(arguments[0]);
             _(records)
               .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; })
               .each(function (rec) {
@@ -241,7 +242,12 @@ Ext.define('CustomApp', {
         .sort(function(a, b) { return b.dy - a.dy; });
 
       link.append("title")
-        .text(function(d) { return d.source.name + " →  " + d.target.name; });
+        .text(function(d) { 
+          console.log(d.source.formattedid); 
+          var t = (d.source.formattedid + " " + d.source.name) + " →  " + (d.target.formattedid + " " + d.target.name); 
+          console.log(t);
+          return t;
+        });
 
       var node = svg.append("g").selectAll(".node")
         .data(this.nodes)
@@ -259,7 +265,7 @@ Ext.define('CustomApp', {
         .style("fill", function(d) { return d.color = color(d.displayColor); })
         .style("stroke", function(d) { return d3.rgb(d.color).darker(2); })
         .append("title")
-        .text(function(d) { return d.name + "\n" + format(d.size); });
+        .text(function(d) { return (d.formattedid + ":" + d.name) + "\n" + format(d.size); });
 
       node
         .on('dblclick', function (d) { Rally.nav.Manager.showDetail(d.ref); });
@@ -270,7 +276,7 @@ Ext.define('CustomApp', {
         .attr("dy", ".35em")
         .attr("text-anchor", "end")
         .attr("transform", null)
-        .text(function(d) { return Ext.util.Format.ellipsis(d.name, 60, true); })
+        .text(function(d) { return Ext.util.Format.ellipsis((d.formattedid+":"+d.name), 60, true); })
         .filter(function(d) { return d.x < width / 2; })
         .attr("x", 6 + sankey.nodeWidth())
         .attr("text-anchor", "start");
