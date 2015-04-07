@@ -12,7 +12,6 @@ Ext.define('CustomApp', {
 
       defaultSettings : {
         showPortfolioItems : true,
-        portfolioItemsType : "PortfolioItem/Feature",
         releaseName : ""
       }
     },
@@ -24,12 +23,6 @@ Ext.define('CustomApp', {
         name: 'showPortfolioItems',
         xtype: 'rallycheckboxfield',
         label: 'Check to chart Portfolio Items',
-        width : 300
-      },
-      {
-        xtype: 'rallyportfolioitemtypecombobox',
-        name : 'portfolioItemsType',
-        label : 'Select the portfolio item type',
         width : 300
       }
     ];
@@ -45,9 +38,6 @@ Ext.define('CustomApp', {
       this.noSuc = 0;
 
       app.showPortfolioItems = app.getSetting('showPortfolioItems');
-      app.portfolioItemsType = app.getSetting('portfolioItemsType');
-
-      console.log("Type:",app.portfolioItemsType);
 
       if (app.showPortfolioItems) {
 
@@ -66,6 +56,7 @@ Ext.define('CustomApp', {
           callback: function (records, options, success) {
             console.log("read:",records.length,records);
             app.piTypePath = _.first(records).get("TypePath");
+            console.log("type:",app.piTypePath);
             app.loadDataWS();
           }
         });
