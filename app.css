@@ -28,3 +28,13 @@
 .blocked:hover {
   stroke-opacity: .5;
 }
+
+.outofscope {
+  color: rgb(0,255,255);
+  background-color: rgb(0,0,255);
+}
+
+.inrelease {
+    border-style: double;
+    border-width: 3px;
+}

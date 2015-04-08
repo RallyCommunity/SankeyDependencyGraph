@@ -6,7 +6,7 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
 
-    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
+    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor','Release'],
 
     config: {
 
@@ -28,6 +28,16 @@ Ext.define('CustomApp', {
     ];
     },
 
+    setTimeBoxRelease : function() {
+      var timeboxScope = this.getContext().getTimeboxScope() ;
+      if (timeboxScope) {
+        var record = timeboxScope.getRecord();
+        app.releaseName = timeboxScope.getType() === 'release' ? record.get('Name') : null;
+      } else {
+        app.releaseName = null;
+      }
+    },
+
 
     launch: function() {
       app = this;
@@ -36,6 +46,10 @@ Ext.define('CustomApp', {
       this.oidMap = {};
       this.noPred = 0;
       this.noSuc = 0;
+
+      // get timebox
+      this.setTimeBoxRelease();
+
 
       app.showPortfolioItems = app.getSetting('showPortfolioItems');
 
@@ -75,8 +89,29 @@ Ext.define('CustomApp', {
 
     },
 
+    onTimeboxScopeChange: function(newTimeboxScope) {
+      this.callParent(arguments);
+      app.setTimeBoxRelease();
+      console.log("Release changed to:",app.releaseName);
+
+      var svg = d3.select('svg');
+
+      var selection = svg.selectAll(".artifact");
+      console.log("selection",selection);
+
+      selection
+        .style("stroke", function(d) { 
+          console.log("d",d);
+          return ( (d.release !== null && (app.releaseName == d.release)) ? 'red' : d3.rgb(d.color).darker(2));
+        });
+
+
+      
+    },
+
     _makeDataObj: function (rec) {
       return {
+        release : rec.get('Release') !== null ? rec.get('Release')._refObjectName : null ,
         formattedid : rec.get('FormattedID'),
         oid: rec.get('ObjectID'),
         name: rec.get('Name'),
@@ -89,18 +124,24 @@ Ext.define('CustomApp', {
 
     loadDataWS: function () {
       var me = this;
+
+      var filter = app.showPortfolioItems ? ( 
+          app.releaseName !== null ? { property:"Release.Name",operator:"=",value:app.releaseName} : null
+        ) : null;
+
       var wss = Ext.create('Rally.data.wsapi.Store', {
         // model: 'UserStory',
         model : app.showPortfolioItems ? /*'PortfolioItem/Feature'*/ app.piTypePath : 'UserStory',
         autoLoad: false,
         fetch: this.fetch,
+        // filters : filter!==null ? [filter] : [],
         limit: Infinity
       });
 
       wss.load({
         scope: this,
         callback: function (records, options, success) {
-          // console.log("read:",records.length);
+          console.log("read:",records.length);
           var recs = _(records)
             .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; }, this)
             .map(function (rec) {
@@ -120,8 +161,8 @@ Ext.define('CustomApp', {
             .value();
 
           Deft.Promise.all(recs).then(function () {
-            console.log('Loaded all succs/preds');
-            console.log(arguments[0]);
+            // console.log('Loaded all succs/preds');
+            // console.log(arguments[0]);
             _(records)
               .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; })
               .each(function (rec) {
@@ -143,8 +184,8 @@ Ext.define('CustomApp', {
               .filter(function (l) { return _.isNumber(l.source) && _.isNumber(l.target); })
               .value();
 
-            //console.log('Data', me.nodes);
-            //console.log('Links', me.links);
+            console.log('Data', me.nodes);
+            console.log('Links', me.links);
             me.render();
           });
 
@@ -203,6 +244,8 @@ Ext.define('CustomApp', {
     },
 
     render: function () {
+
+
       var w = this.getWidth(),
           h = this.getHeight(),
           t = (this.noPred > this.noSuc) ? this.noPred : this.noSuc;
@@ -243,9 +286,7 @@ Ext.define('CustomApp', {
 
       link.append("title")
         .text(function(d) { 
-          console.log(d.source.formattedid); 
-          var t = (d.source.formattedid + " " + d.source.name) + " →  " + (d.target.formattedid + " " + d.target.name); 
-          console.log(t);
+          var t = (d.source.formattedid + " " + d.source.name) + " ->  " + (d.target.formattedid + " " + d.target.name); 
           return t;
         });
 
@@ -260,10 +301,13 @@ Ext.define('CustomApp', {
         .on("drag", dragmove));
 
       node.append("rect")
+        .attr("class","artifact")
         .attr("height", function(d) { return d.dy; })
         .attr("width", sankey.nodeWidth())
         .style("fill", function(d) { return d.color = color(d.displayColor); })
-        .style("stroke", function(d) { return d3.rgb(d.color).darker(2); })
+        .style("stroke", function(d) { 
+          return ( (d.release !== null && (app.releaseName == d.release)) ? 'red' : d3.rgb(d.color).darker(2));
+        })
         .append("title")
         .text(function(d) { return (d.formattedid + ":" + d.name) + "\n" + format(d.size); });
 
