@@ -49,6 +49,7 @@ Ext.define('CustomApp', {
 
       // get timebox
       this.setTimeBoxRelease();
+      console.log(app.releaseName);
 
 
       app.showPortfolioItems = app.getSetting('showPortfolioItems');
@@ -97,16 +98,21 @@ Ext.define('CustomApp', {
       var svg = d3.select('svg');
 
       var selection = svg.selectAll(".artifact");
-      console.log("selection",selection);
 
       selection
-        .style("stroke", function(d) { 
-          console.log("d",d);
-          return ( (d.release !== null && (app.releaseName == d.release)) ? 'red' : d3.rgb(d.color).darker(2));
+        .attr("style", function(d) { 
+          return app._makeStyle(d,app.releaseName);
         });
+    },
 
-
-      
+    _makeStyle : function(d,selectedRelease) {
+        var style = '';
+        if (selectedRelease!==null && d.release===selectedRelease) {
+          style = 'stroke:red;stroke-width:2;fill:' + (d.displayColor);
+        } else {
+          style = 'stroke-width:1;stroke:'+ d3.rgb(d.color).darker(2) + ';fill:'+(d.displayColor);
+        }
+        return style;
     },
 
     _makeDataObj: function (rec) {
@@ -304,10 +310,11 @@ Ext.define('CustomApp', {
         .attr("class","artifact")
         .attr("height", function(d) { return d.dy; })
         .attr("width", sankey.nodeWidth())
-        .style("fill", function(d) { return d.color = color(d.displayColor); })
-        .style("stroke", function(d) { 
-          return ( (d.release !== null && (app.releaseName == d.release)) ? 'red' : d3.rgb(d.color).darker(2));
-        })
+        // .style("fill", function(d) { return d.color = color(d.displayColor); })
+        // .style("stroke", function(d) { 
+        //   return ( (d.release !== null && (app.releaseName == d.release)) ? 'red' : d3.rgb(d.color).darker(2));
+        // })
+        .attr('style',function(d){ return app._makeStyle(d,app.releaseName);})
         .append("title")
         .text(function(d) { return (d.formattedid + ":" + d.name) + "\n" + format(d.size); });
 
