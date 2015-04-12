@@ -38,3 +38,7 @@
     border-style: double;
     border-width: 3px;
 }
+
+.hidden {
+  display: none;
+}

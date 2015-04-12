@@ -6,13 +6,14 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
 
-    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor','Release'],
+    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor','Release','Parent'],
 
     config: {
 
       defaultSettings : {
         showPortfolioItems : true,
-        releaseName : ""
+        releaseName : "",
+        parentId : ''
       }
     },
 
@@ -24,6 +25,11 @@ Ext.define('CustomApp', {
         xtype: 'rallycheckboxfield',
         label: 'Check to chart Portfolio Items',
         width : 300
+      },
+      {
+                name: 'parentId',
+                xtype: 'rallytextfield',
+                label : "Parent Portfolio Item (ID), if specified view will be be filtered to children of this item. eg. I292"
       }
     ];
     },
@@ -49,7 +55,6 @@ Ext.define('CustomApp', {
 
       // get timebox
       this.setTimeBoxRelease();
-      console.log(app.releaseName);
 
 
       app.showPortfolioItems = app.getSetting('showPortfolioItems');
@@ -124,12 +129,16 @@ Ext.define('CustomApp', {
         size: rec.get('PlanEstimate'),
         blocked: rec.get('Blocked'),
         displayColor: rec.get('DisplayColor') || '#00A9E0',
-        ref: '/hierarchicalrequirement/' + rec.get('ObjectID')
+        ref: '/hierarchicalrequirement/' + rec.get('ObjectID'),
+        parentId : rec.get('Parent') !== null ? rec.get('Parent').FormattedID : null
       };
     },
 
     loadDataWS: function () {
       var me = this;
+
+      var parentId = me.getSetting("parentId");
+      parentID = parentId !== null && parentId !== '' ? parentId : null;
 
       var filter = app.showPortfolioItems ? ( 
           app.releaseName !== null ? { property:"Release.Name",operator:"=",value:app.releaseName} : null
@@ -144,10 +153,17 @@ Ext.define('CustomApp', {
         limit: Infinity
       });
 
+      var getParent = function(r) {
+        if (!_.isNull(r.get("Parent")))
+          return r.get("Parent").FormattedID;
+        else
+          return null;
+      }
+
       wss.load({
         scope: this,
         callback: function (records, options, success) {
-          console.log("read:",records.length);
+          console.log("read:",records.length,records);
           var recs = _(records)
             .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; }, this)
             .map(function (rec) {
@@ -156,46 +172,56 @@ Ext.define('CustomApp', {
 
               if (rec.data.Successors.Count) {
                 ret.push(rec.getCollection('Successors').load({fetch: me.fetch}).then(function (succs) {
-                  _.each(succs, function (t) { me.links.push({source: s, target: t.get('ObjectID'), link: 1}); });
+                  _.each(succs, function (t) { 
+                    // filter by parentId if specified
+                    if (parentId===null) {
+                      me.links.push({source: s, target: t.get('ObjectID'), link: 1});
+                    }
+                    else {
+                      if ( getParent(rec) === parentId || getParent(t) === parentId)
+                        me.links.push({source: s, target: t.get('ObjectID'), link: 1});
+                    }
+                  });
                   return true;
                 }));
               }
-
               return ret;
             }, this)
             .flatten()
             .value();
 
           Deft.Promise.all(recs).then(function () {
-            // console.log('Loaded all succs/preds');
-            // console.log(arguments[0]);
             _(records)
-              .filter(function (rec) { return rec.data.PredecessorsAndSuccessors.Count; })
+              .filter(function (rec) { 
+                return rec.data.PredecessorsAndSuccessors.Count; 
+              })
               .each(function (rec) {
-                this.nodes.push(this._makeDataObj(rec));
-
-                this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
-
-                //console.log(rec.get('Name'), rec.getCollection('Successors').getCount());
-                //console.dir(rec.getCollection('Successors'));
-                //_.each(rec.getCollection('Successors').getRange(), function (succ) {
-                  //console.log('Found Successor', succ.data);
-                  //this.links.push({source: rec.get('ObjectID'), target: succ.get('ObjectID'), value: 1});
-                //}, this);
+                var ll = _.find(me.links,function(link){
+                  return rec.get("ObjectID") === link.source ||
+                    rec.get("ObjectID") === link.target; 
+                });
+                if (!_.isUndefined(ll)) {
+                  this.nodes.push(this._makeDataObj(rec));
+                  this.oidMap[rec.get('ObjectID')] = this.nodes.length - 1;
+                }
 
               }, me);
+
+              // identify unlinked nodes
+              me.unlinkedNodes = _.filter(me.nodes,function(node) {
+                var ll = _.find(me.links,function(link){
+                  return link.source === node.oid || link.target === node.oid;
+                });
+                return _.isUndefined(ll);
+              });
 
             me.links = _(me.links)
               .map(function (l) { return { source: me.oidMap[l.source], target: me.oidMap[l.target], value: 1 }; })
               .filter(function (l) { return _.isNumber(l.source) && _.isNumber(l.target); })
               .value();
 
-            console.log('Data', me.nodes);
-            console.log('Links', me.links);
             me.render();
           });
-
-          //console.log(recs);
         }
       });
     },
@@ -251,6 +277,10 @@ Ext.define('CustomApp', {
 
     render: function () {
 
+      var me = this;
+
+      console.log("me.links",this.nodes,this.links);
+
 
       var w = this.getWidth(),
           h = this.getHeight(),
@@ -299,21 +329,25 @@ Ext.define('CustomApp', {
       var node = svg.append("g").selectAll(".node")
         .data(this.nodes)
         .enter().append("g")
-        .attr("class", "node")
+        .attr("class", "node") 
         .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; })
       .call(d3.behavior.drag()
         .origin(function(d) { return d; })
         .on("dragstart", function() { this.parentNode.appendChild(this); })
         .on("drag", dragmove));
 
+      // hide any unlinked nodes. (may have been filtered out by selection)
+      // node.attr("class",function(d) {
+      //   var isUnlinked = !_.isUndefined(_.find(me.unlinkedNodes,function(n) {
+      //     return n.oid === d.oid;
+      //   }));
+      //   return isUnlinked ? 'node hidden' : 'node';
+      // })
+
       node.append("rect")
         .attr("class","artifact")
         .attr("height", function(d) { return d.dy; })
         .attr("width", sankey.nodeWidth())
-        // .style("fill", function(d) { return d.color = color(d.displayColor); })
-        // .style("stroke", function(d) { 
-        //   return ( (d.release !== null && (app.releaseName == d.release)) ? 'red' : d3.rgb(d.color).darker(2));
-        // })
         .attr('style',function(d){ return app._makeStyle(d,app.releaseName);})
         .append("title")
         .text(function(d) { return (d.formattedid + ":" + d.name) + "\n" + format(d.size); });
