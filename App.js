@@ -6,12 +6,12 @@ Ext.define('CustomApp', {
     extend: 'Rally.app.App',
     componentCls: 'app',
 
-    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor','Release','Parent'],
+    fetch: ['ObjectID','FormattedID','Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor','Release','Parent','_ItemHierarchy'],
 
     config: {
 
       defaultSettings : {
-        showPortfolioItems : true,
+        showPortfolioItems : false,
         releaseName : "",
         parentId : ''
       }
@@ -44,8 +44,8 @@ Ext.define('CustomApp', {
       }
     },
 
-
     launch: function() {
+      // console.log(this.getContext().getWorkspace());
       app = this;
       this.nodes = [];
       this.links = [];
@@ -56,13 +56,50 @@ Ext.define('CustomApp', {
       // get timebox
       this.setTimeBoxRelease();
 
+      // Check to see if a parent portfolio item has been set.
+      app.parentId = app.getSetting("parentId");
+      app.parentId = app.parentId !== null && app.parentId !== '' ? app.parentId : null;
+
+      if (!_.isNull(app.parentId)) {
+        this.readParentItem(app.parentId,function(item){
+          app.parentObjectId = item.get("ObjectID");
+          app.run(app.parentObjectId);
+        })
+      } else {
+        this.run(null);
+      }
+    },
+
+    readParentItem : function(id,callback) {
+
+      var piStore = Ext.create('Rally.data.wsapi.Store', {
+        model : 'PortfolioItem',
+        autoLoad: true,
+        fetch: ['FormattedID','ObjectID'],
+        filters : [
+          { property : "FormattedID" , operator : "contains" , value : id }
+        ],
+        limit: Infinity,
+          listeners : {
+            scope : this,
+            load : function(store, data) {
+              var item = _.find(data,function(d){
+                return id === d.get("FormattedID");
+              });
+              callback(item);
+            }
+          }
+      });
+
+    },
+
+    run: function( parentObjectId ) {
 
       app.showPortfolioItems = app.getSetting('showPortfolioItems');
 
       if (app.showPortfolioItems) {
 
         var piStore = Ext.create('Rally.data.wsapi.Store', {
-          // model: 'UserStory',
           model : 'TypeDefinition',
           autoLoad: false,
           fetch: ['Name','TypePath'],
@@ -74,23 +111,14 @@ Ext.define('CustomApp', {
         piStore.load({
           scope: this,
           callback: function (records, options, success) {
-            // console.log("read:",records.length,records);
             app.piTypePath = _.first(records).get("TypePath");
-            // console.log("type:",app.piTypePath);
             app.loadDataWS();
           }
         });
 
       } else {
-        if ( !_.isUndefined(window) && 
-              !_.isUndefined(window.parent) &&
-                !_.isUndefined(window.parent.FEATURE_TOGGLES) &&
-                  (window.parent.FEATURE_TOGGLES.A2_ENABLE_CHARTING_APPLICATIONS === true) &&
-                  (app.showPortfolioItems===false)) {
-                    this.loadDataLB();
-                  } else {
-                    this.loadDataWS();        
-                }
+        // always use lookback
+        this.loadDataLB();
       }
 
     },
@@ -137,15 +165,11 @@ Ext.define('CustomApp', {
     loadDataWS: function () {
       var me = this;
 
-      var parentId = me.getSetting("parentId");
-      parentID = parentId !== null && parentId !== '' ? parentId : null;
-
       var filter = app.showPortfolioItems ? ( 
           app.releaseName !== null ? { property:"Release.Name",operator:"=",value:app.releaseName} : null
         ) : null;
 
       var wss = Ext.create('Rally.data.wsapi.Store', {
-        // model: 'UserStory',
         model : app.showPortfolioItems ? /*'PortfolioItem/Feature'*/ app.piTypePath : 'UserStory',
         autoLoad: false,
         fetch: this.fetch,
@@ -174,11 +198,11 @@ Ext.define('CustomApp', {
                 ret.push(rec.getCollection('Successors').load({fetch: me.fetch}).then(function (succs) {
                   _.each(succs, function (t) { 
                     // filter by parentId if specified
-                    if (parentId===null) {
+                    if (app.parentId===null) {
                       me.links.push({source: s, target: t.get('ObjectID'), link: 1});
                     }
                     else {
-                      if ( getParent(rec) === parentId || getParent(t) === parentId)
+                      if ( getParent(rec) === app.parentId || getParent(t) === app.parentId)
                         me.links.push({source: s, target: t.get('ObjectID'), link: 1});
                     }
                   });
@@ -226,15 +250,10 @@ Ext.define('CustomApp', {
       });
     },
 
-    loadDataLB: function () {
-      var sss = Ext.create('Rally.data.lookback.SnapshotStore', {
-        autoLoad: false,
-        context: {
-          workspace: this.getContext().getWorkspaceRef()
-        },
-        fetch: this.fetch,
-        hydrate: ['ScheduleState'],
-        find: {
+    // create the find clause for the lookback query
+    createLBFind : function() {
+
+        var find = {
           _TypeHierarchy: 'HierarchicalRequirement',
           _ProjectHierarchy: { $in: [this.getContext().getProject().ObjectID] },
           __At: 'current',
@@ -243,13 +262,32 @@ Ext.define('CustomApp', {
             { Predecessors: { $ne: null } }
           ]
         }
+        // narrow to just children of the parent 
+        if ((app.parentObjectId)) {
+          find["_ItemHierarchy"] = { $in: [app.parentObjectId] };
+        }
+        return find;
+
+    },
+
+    loadDataLB: function () {
+      var find = app.createLBFind();
+
+      var sss = Ext.create('Rally.data.lookback.SnapshotStore', {
+        autoLoad: false,
+        context: {
+          workspace: this.getContext().getWorkspaceRef()
+        },
+        fetch: this.fetch,
+        hydrate: ['ScheduleState'],
+        find : find
       });
 
       sss.load({
         scope: this,
         callback: function (records, options, success) {
           var source, target;
-
+          console.log("records",_.map(records,function(r){return r.get("FormattedID");}));
           _.each(records, function (rec) {
             this.nodes.push(this._makeDataObj(rec));
 
@@ -264,6 +302,8 @@ Ext.define('CustomApp', {
             _.each(rec.get('Successors'), function (suc) {
               target = this.oidMap[suc];
 
+
+
             if (_.isNumber(source) && _.isNumber(target)) {
                 this.links.push({source: source, target: target, value: 1});
               }
@@ -276,11 +316,7 @@ Ext.define('CustomApp', {
     },
 
     render: function () {
-
       var me = this;
-
-      console.log("me.links",this.nodes,this.links);
-
 
       var w = this.getWidth(),
           h = this.getHeight(),
@@ -335,14 +371,6 @@ Ext.define('CustomApp', {
         .origin(function(d) { return d; })
         .on("dragstart", function() { this.parentNode.appendChild(this); })
         .on("drag", dragmove));
-
-      // hide any unlinked nodes. (may have been filtered out by selection)
-      // node.attr("class",function(d) {
-      //   var isUnlinked = !_.isUndefined(_.find(me.unlinkedNodes,function(n) {
-      //     return n.oid === d.oid;
-      //   }));
-      //   return isUnlinked ? 'node hidden' : 'node';
-      // })
 
       node.append("rect")
         .attr("class","artifact")
