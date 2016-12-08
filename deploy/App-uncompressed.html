@@ -9602,6 +9602,10 @@ Ext.define('CustomApp', {
 
     fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
 
+    notInDatasetColor: '#000000',
+    autoScroll: false,
+    margin: 25,
+
     launch: function() {
       this.nodes = [];
       this.links = [];
@@ -9832,39 +9836,36 @@ Ext.define('CustomApp', {
     </script>
 
 
+
     <style type="text/css">
         .node rect {
   cursor: move;
   fill-opacity: .9;
   shape-rendering: crispEdges;
 }
-
 .node text {
   pointer-events: none;
   text-shadow: 0 1px 0 #fff;
 }
-
 .link {
   fill: none;
   stroke: #000;
   stroke-opacity: .2;
 }
-
 .link:hover {
   stroke-opacity: .5;
 }
-
 .blocked {
   fill: none;
   stroke: #F00;
   stroke-opacity: .2;
 }
-
 .blocked:hover {
   stroke-opacity: .5;
 }
 
     </style>
 </head>
-<body></body>
+<body>
+</body>
 </html>

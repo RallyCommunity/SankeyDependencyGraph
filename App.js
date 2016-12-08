@@ -7,6 +7,10 @@ Ext.define('CustomApp', {
 
     fetch: ['Name', 'PlanEstimate', 'Predecessors', 'Successors', 'Blocked', 'BlockedReason', 'ScheduleState', 'DisplayColor'],
 
+    notInDatasetColor: '#000000',
+    autoScroll: false,
+    margin: 25,
+
     launch: function() {
       this.nodes = [];
       this.links = [];
